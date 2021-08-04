@@ -1,0 +1,133 @@
+
+
+cloud_order是根据rangeimg顺序存储的点云
+
+
+void Preprocessing::cloudSegmentation(bool seg_flag) {
+
+    if (!seg_flag) {
+        //look for start and end index in each lidar beam
+        //only remain the valid point cloud with xyzi and valid normal
+        int size = 0;
+        int count = 0;
+        for (int i = 0; i < BeamNum; i++) {
+            start_ind_[i] = size - 1 + 5;
+            while (size < cloud_order_->size()) {
+                if (cloud_order_->points[size].intensity != -1) {
+                    int row = int(cloud_order_->points[size].intensity);
+                    int col = (int) ((cloud_order_->points[size].intensity - row) * 10000.0);
+                    Eigen::Vector3d normal;
+                    normal[0] = normals_->points[row * HorizonNum + col].normal_x;  ///TODO
+                    normal[1] = normals_->points[row * HorizonNum + col].normal_y;
+                    normal[2] = normals_->points[row * HorizonNum + col].normal_z;
+
+                    valid_col_[size]=col;
+                    valid_cloud_->push_back(cloud_order_->points[size]);
+                    segment_normals_[size] = normal;
+
+                    if (row == i) {
+                        size++;
+                    }
+                    if (row > i) {
+                        end_ind_[i] = size - 1 - 5;
+                        size++;
+                        break;
+                    }
+                }else{
+                    size++;
+                }
+            }
+        }
+
+    }
+
+
+    else {
+        for (int i = 0; i < BeamNum; i++) {
+            for (int j = 0; j < HorizonNum; j++) {
+                //label_mat_
+                //label > 0 : label of objects
+                //label = 0 : initial status, not segmented into one object
+                //label = 9999 : outliers
+                //label for ground/invalid points ： -1
+                //try clustering only for the non-ground points and valid points
+
+                if (label_mat_.at<int>(i, j) == 0)
+                    componentsLabeling(i, j, label_mat_, range_mat_);
+            }
+        }
+
+        int cloud_segment_size = 0;
+
+        for (int i = 0; i < BeamNum; i++) {
+            for (int j = 0; j < HorizonNum; j++) {
+                if (label_mat_.at<int>(i, j) > 0) {
+                    if (label_mat_.at<int>(i, j) == 9999) {
+                        //if (i < GroundScanId && j % 5 == 0) {
+                        //for non-ground points and every 5 points (dowmsample?)
+                        cloud_outliers_->push_back(cloud_order_->points[j + i * HorizonNum]);
+                        continue;
+                        //}
+                        //continue;
+                    }
+
+
+                    if (ground_mat_.at<int>(i, j) == 1) {
+                        if (j % 5 != 0 && j > 5 && j < HorizonNum - 5)
+                            continue;
+                    }
+
+                    //segmentedCloud_range[cloud_segment_size] = range_mat_.at<double>(i, j);
+                    //segmentedCloud_colind[cloud_segment_size] = j;
+                    cloud_segment_->push_back(cloud_order_->points[j + i * HorizonNum]); //TODO
+                    ++cloud_segment_size;
+                }
+            }
+        }
+        std::cout << " cloud_outliers_size " << cloud_outliers_->size() << std::endl;
+        std::cout << " cloud_segment_size " << cloud_segment_size << std::endl;
+
+
+        //look for start and end index in each lidar beam
+        //only remain the valid point cloud with xyzi and valid normal
+        int size = 0;
+        int count = 0;
+        for (int i = 0; i < BeamNum; i++) {
+            start_ind_[i] = size + 5;    ///TODO Check
+            while (size < cloud_segment_->size()) {
+                int row = int(cloud_segment_->points[size].intensity);
+                int col = (int) ((cloud_segment_->points[size].intensity - row) * 10000.0);
+                Eigen::Vector3d normal;
+                normal[0] = normals_->points[row * HorizonNum + col].normal_x;  //
+                normal[1] = normals_->points[row * HorizonNum + col].normal_y;
+                normal[2] = normals_->points[row * HorizonNum + col].normal_z;
+
+                double check = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+                if (check < 1.5 && check > 0.6 && !isnan(normal[0]) && !isnan(normal[1]) && !isnan(normal[2])) {
+                    valid_col_[size] = col;
+                    valid_cloud_->push_back(cloud_segment_->points[size]);
+
+                    segment_normals_[size] = normal;
+
+                    if (row == i) {
+                        size++;
+                    }
+                    if (row > i) {
+                        end_ind_[i] = size - 1 - 5;
+                        size++;
+                        break;
+                    }
+
+                } else {
+                    size++;
+
+                }
+
+            }
+        }
+
+    }
+
+
+
+}

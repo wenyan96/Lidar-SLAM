@@ -1,0 +1,26 @@
+BeamNum: 64
+HorizonNum: 1800
+StartScanId: 10
+AngRes_x: 360.0 / double(HorizonNum)  #0.192
+AngRes_y: 26.8 / (BeamNum - 1.0)   #0.425
+AngUp: 2
+AngBottom: -24.8
+AngRangeHalf: (AngUp - AngBottom) / 2
+
+
+# groundRemoval
+GroundThreshold: 40  #m
+GroundSize: 11
+GroundDsSize: 22
+
+
+# cloudSegmentation
+SegmentAngle: 40.0   #decrease this value may improve accuracy
+SegmentValidPointNum1: 30
+SegmentValidPointNum2: 7
+SegmentValidLineNum: 4
+
+
+# featureExtraction
+edgeThreshold: 5
+surfThreshold: 8
